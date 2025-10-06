@@ -30,7 +30,7 @@ async function createRequests(data) {
                 if (item[fieldConfig.customId]) {
                     field.text = "" + item[fieldConfig.customId];
                 } else {
-                    field.text = "";
+                    field.text = " ";
                 }
                 annotations.push(field);
             }
