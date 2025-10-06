@@ -27,9 +27,8 @@ async function createRequests(data) {
         template.signFields.forEach(field => {
             if (field.type === "annotation") {
                 let fieldConfig = JSON.parse(field.config);
-                //console.log(fieldConfig.customId);
                 if (item[fieldConfig.customId]) {
-                    field.text = item[fieldConfig.customId];
+                    field.text = "" + item[fieldConfig.customId];
                 } else {
                     field.text = "";
                 }
