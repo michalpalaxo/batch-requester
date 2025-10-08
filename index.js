@@ -47,7 +47,7 @@ async function createRequests(data) {
             }
             if (field.type === "initials") {
                 if (field.order === 1) {
-                    field.blob = signatureId;
+                    field.blob = initialsId;
                     signatures.push(field);
                 }
                 if (field.order === 2) {
