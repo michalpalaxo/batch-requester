@@ -9,6 +9,7 @@ nconf.file({file: 'config.json'});
 const token = nconf.get('token');
 const templateId = nconf.get('templateId');
 const signatureId = nconf.get('signatureId');
+const initialsId = nconf.get('initialsId');
 const URI = nconf.get('URI');
 
 async function createRequests(data) {
@@ -35,6 +36,16 @@ async function createRequests(data) {
                 annotations.push(field);
             }
             if (field.type === "signature") {
+                if (field.order === 1) {
+                    field.blob = signatureId;
+                    signatures.push(field);
+                }
+                if (field.order === 2) {
+                    field.user = [shareTo];
+                    signatureFields.push(field);
+                }
+            }
+            if (field.type === "initials") {
                 if (field.order === 1) {
                     field.blob = signatureId;
                     signatures.push(field);
