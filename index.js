@@ -10,6 +10,7 @@ const token = nconf.get('token');
 const templateId = nconf.get('templateId');
 const signatureId = nconf.get('signatureId');
 const initialsId = nconf.get('initialsId');
+const stampId = nconf.get('stampId');
 const URI = nconf.get('URI');
 
 async function createRequests(data) {
@@ -24,38 +25,56 @@ async function createRequests(data) {
         let annotations = [];
         let signatures = [];
         let signatureFields = [];
+        let signatureData = [];
+
+        let useMailOTP = false;
+        let message = null;
+
+        if(template.signEntities[1].shareData[0].mailProtection){
+            useMailOTP = true;
+        }
+
+        if(template.signEntities[1].shareData[0].message){
+            message = template.signEntities[1].shareData[0].message;
+        }
+
+        signatureData.push(await generateShareTo(shareTo, 2, message, useMailOTP));
+
         //assign annotation, signatures and signature fields
-        template.signFields.forEach(field => {
+        for (let j = 0; j < template.signFields.length; j++) {
+            let field = template.signFields[j];
+
             if (field.type === "annotation") {
                 let fieldConfig = JSON.parse(field.config);
                 if (item[fieldConfig.customId]) {
-                    field.text = "" + item[fieldConfig.customId];
+                    field.text = " " + item[fieldConfig.customId];
                 } else {
-                    field.text = " ";
+                    field.text = "N/A";
                 }
                 annotations.push(field);
             }
-            if (field.type === "signature") {
+
+            if (field.type === "signature" || field.type === "initials" || field.type === "stamp") {
                 if (field.order === 1) {
-                    field.blob = signatureId;
+                    if (field.type === "signature") {
+                        field.blob = signatureId;
+                    }
+                    if (field.type === "initials") {
+                        field.blob = initialsId;
+                    }
+                    if (field.type === "stamp") {
+                        field.blob = stampId;
+                    }
                     signatures.push(field);
-                }
-                if (field.order === 2) {
+                } else if (field.order === 2) {
                     field.user = [shareTo];
+                    signatureFields.push(field);
+                } else {
+                    signatureData.push(await generateShareTo(field.user[0], field.order, null, false));
                     signatureFields.push(field);
                 }
             }
-            if (field.type === "initials") {
-                if (field.order === 1) {
-                    field.blob = initialsId;
-                    signatures.push(field);
-                }
-                if (field.order === 2) {
-                    field.user = [shareTo];
-                    signatureFields.push(field);
-                }
-            }
-        });
+        }
         //download template file
         await downloadFile(template.file);
         //upload new file from the template
@@ -63,7 +82,7 @@ async function createRequests(data) {
         //create a document
         let document = await createDocument("Document for " + shareTo, uploadedFile.file.fileId);
         //create the share
-        await shareDocument(document.results[0].documentId, shareTo, annotations, signatures, signatureFields);
+        await shareDocument(document.results[0].documentId, signatureData, annotations, signatures, signatureFields);
     }
 }
 
@@ -159,8 +178,29 @@ async function createDocument(fileName, fileHash) {
     return rp(options);
 }
 
+async function generateShareTo(email, order, message, mailOtp) {
+    let data = {
+        "sharePurpose": "sign",
+        "shareTo": email,
+        "rights": [
+            "print"
+        ],
+        "order": order
+    };
 
-async function shareDocument(documentId, shareTo, annotations, signatures, signatureFields) {
+    if(message){
+        data.message = message;
+    }
+
+    if(mailOtp){
+        data.mail = email;
+    }
+
+    return data;
+}
+
+
+async function shareDocument(documentId, data, annotations, signatures, signatureFields) {
     let options = {
         method: 'POST',
         uri: URI + 'share?token=' + token,
@@ -168,16 +208,7 @@ async function shareDocument(documentId, shareTo, annotations, signatures, signa
             "objectType": "document",
             "id": documentId,
             "type": "d_default",
-            "data": [
-                {
-                    "sharePurpose": "sign",
-                    "shareTo": shareTo,
-                    "rights": [
-                        "print"
-                    ],
-                    "order": 2
-                }
-            ],
+            "data": data,
             "force": false,
             "sequential": true,
             "signatureType": "image",
