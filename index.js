@@ -13,6 +13,8 @@ const initialsId = nconf.get('initialsId');
 const stampId = nconf.get('stampId');
 const URI = nconf.get('URI');
 
+const DYNAMIC_USER_POSITION = 4;
+
 async function createRequests(data) {
 
     //load the template
@@ -30,15 +32,15 @@ async function createRequests(data) {
         let useMailOTP = false;
         let message = null;
 
-        if(template.signEntities[1].shareData[0].mailProtection){
+        if (template.signEntities[1].shareData[0].mailProtection) {
             useMailOTP = true;
         }
 
-        if(template.signEntities[1].shareData[0].message){
+        if (template.signEntities[1].shareData[0].message) {
             message = template.signEntities[1].shareData[0].message;
         }
 
-        signatureData.push(await generateShareTo(shareTo, 2, message, useMailOTP));
+        signatureData.push(await generateShareTo(shareTo, DYNAMIC_USER_POSITION, message, useMailOTP));
 
         //assign annotation, signatures and signature fields
         for (let j = 0; j < template.signFields.length; j++) {
@@ -66,7 +68,7 @@ async function createRequests(data) {
                         field.blob = stampId;
                     }
                     signatures.push(field);
-                } else if (field.order === 2) {
+                } else if (field.order === DYNAMIC_USER_POSITION) {
                     field.user = [shareTo];
                     signatureFields.push(field);
                 } else {
@@ -188,11 +190,11 @@ async function generateShareTo(email, order, message, mailOtp) {
         "order": order
     };
 
-    if(message){
+    if (message) {
         data.message = message;
     }
 
-    if(mailOtp){
+    if (mailOtp) {
         data.mail = email;
     }
 
