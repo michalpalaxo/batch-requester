@@ -32,15 +32,34 @@ async function createRequests(data) {
         let useMailOTP = false;
         let message = null;
 
-        if (template.signEntities[1].shareData[0].mailProtection) {
+        if (template.signEntities[DYNAMIC_USER_POSITION-1].shareData[0].mailProtection) {
             useMailOTP = true;
         }
 
-        if (template.signEntities[1].shareData[0].message) {
+        if (template.signEntities[DYNAMIC_USER_POSITION-1].shareData[0].message) {
             message = template.signEntities[1].shareData[0].message;
         }
 
-        signatureData.push(await generateShareTo(shareTo, DYNAMIC_USER_POSITION, message, useMailOTP));
+        signatureData.push(await generateShareTo("sign", shareTo, DYNAMIC_USER_POSITION, message, useMailOTP));
+
+        //add non-sign fields
+        for (let j = 0; j < template.signEntities.length; j++) {
+            let signEntity = template.signEntities[j];
+            if(signEntity.shareType !== "sign"){
+                let useMailOTPloc = false;
+                let messageLoc = null;
+
+                if (signEntity.shareData[0].mailProtection) {
+                    useMailOTPloc = true;
+                }
+
+                if (signEntity.shareData[0].message) {
+                    messageLoc = signEntity.shareData[0].message;
+                }
+
+                signatureData.push(await generateShareTo(signEntity.shareType, signEntity.shareData[0].user.name, signEntity.order, messageLoc, useMailOTPloc));
+            }
+        }
 
         //assign annotation, signatures and signature fields
         for (let j = 0; j < template.signFields.length; j++) {
@@ -72,7 +91,7 @@ async function createRequests(data) {
                     field.user = [shareTo];
                     signatureFields.push(field);
                 } else {
-                    signatureData.push(await generateShareTo(field.user[0], field.order, null, false));
+                    signatureData.push(await generateShareTo("sign", field.user[0], field.order, null, false));
                     signatureFields.push(field);
                 }
             }
@@ -180,9 +199,9 @@ async function createDocument(fileName, fileHash) {
     return rp(options);
 }
 
-async function generateShareTo(email, order, message, mailOtp) {
+async function generateShareTo(type, email, order, message, mailOtp) {
     let data = {
-        "sharePurpose": "sign",
+        "sharePurpose": type,
         "shareTo": email,
         "rights": [
             "print"
