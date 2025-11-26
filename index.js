@@ -37,7 +37,7 @@ async function createRequests(data) {
         }
 
         if (template.signEntities[DYNAMIC_USER_POSITION-1].shareData[0].message) {
-            message = template.signEntities[1].shareData[0].message;
+            message = template.signEntities[DYNAMIC_USER_POSITION-1].shareData[0].message;
         }
 
         signatureData.push(await generateShareTo("sign", shareTo, DYNAMIC_USER_POSITION, message, useMailOTP));
