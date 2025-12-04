@@ -222,7 +222,12 @@ async function generateShareTo(type, email, order, shareData) {
         data.message = shareData.message;
     }
 
-    if (shareData.mailProtection) {
+    const emailRegex = new RegExp(
+        /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+    );
+
+    //disable mail protection for users with username
+    if (shareData.mailProtection && emailRegex.test(email.toLowerCase())) {
         data.mail = email;
     }
 
