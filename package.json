@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "date-fns": "^4.1.0",
     "nconf": "^0.13.0",
     "papaparse": "^5.5.3",
     "request-promise": "^4.2.6"

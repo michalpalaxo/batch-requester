@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const Papa = require('papaparse');
 const nconf = require('nconf')
+const dateFns = require('date-fns');
 
 nconf.file({file: 'config.json'});
 
@@ -29,35 +30,17 @@ async function createRequests(data) {
         let signatureFields = [];
         let signatureData = [];
 
-        let useMailOTP = false;
-        let message = null;
+        let signEntity = await getSignEntityByOrder(DYNAMIC_USER_POSITION, template);
+        let shareData = signEntity.shareData[0];
 
-        if (template.signEntities[DYNAMIC_USER_POSITION-1].shareData[0].mailProtection) {
-            useMailOTP = true;
-        }
-
-        if (template.signEntities[DYNAMIC_USER_POSITION-1].shareData[0].message) {
-            message = template.signEntities[DYNAMIC_USER_POSITION-1].shareData[0].message;
-        }
-
-        signatureData.push(await generateShareTo("sign", shareTo, DYNAMIC_USER_POSITION, message, useMailOTP));
+        signatureData.push(await generateShareTo("sign", shareTo, DYNAMIC_USER_POSITION, shareData));
 
         //add non-sign fields
         for (let j = 0; j < template.signEntities.length; j++) {
             let signEntity = template.signEntities[j];
-            if(signEntity.shareType !== "sign"){
-                let useMailOTPloc = false;
-                let messageLoc = null;
-
-                if (signEntity.shareData[0].mailProtection) {
-                    useMailOTPloc = true;
-                }
-
-                if (signEntity.shareData[0].message) {
-                    messageLoc = signEntity.shareData[0].message;
-                }
-
-                signatureData.push(await generateShareTo(signEntity.shareType, signEntity.shareData[0].user.name, signEntity.order, messageLoc, useMailOTPloc));
+            if (signEntity.shareType !== "sign") {
+                let shareData = signEntity.shareData[0];
+                signatureData.push(await generateShareTo(signEntity.shareType, signEntity.shareData[0].user.name, signEntity.order, shareData));
             }
         }
 
@@ -65,18 +48,22 @@ async function createRequests(data) {
         for (let j = 0; j < template.signFields.length; j++) {
             let field = template.signFields[j];
 
+            let signEntity = await getSignEntityByRoleId(field.userRoleId, template);
+            let shareData = signEntity.shareData[0];
+
             if (field.type === "annotation") {
                 let fieldConfig = JSON.parse(field.config);
                 if (item[fieldConfig.customId]) {
                     field.text = " " + item[fieldConfig.customId];
                 } else {
-                    field.text = "N/A";
+                    field.text = "Null";
                 }
                 annotations.push(field);
             }
 
             if (field.type === "signature" || field.type === "initials" || field.type === "stamp") {
                 if (field.order === 1) {
+                    //fist position - I am signing
                     if (field.type === "signature") {
                         field.blob = signatureId;
                     }
@@ -88,10 +75,12 @@ async function createRequests(data) {
                     }
                     signatures.push(field);
                 } else if (field.order === DYNAMIC_USER_POSITION) {
+                    //position of the user from the CSV
                     field.user = [shareTo];
                     signatureFields.push(field);
                 } else {
-                    signatureData.push(await generateShareTo("sign", field.user[0], field.order, null, false));
+                    //every other participant
+                    signatureData.push(await generateShareTo("sign", field.user[0], field.order, shareData));
                     signatureFields.push(field);
                 }
             }
@@ -105,6 +94,14 @@ async function createRequests(data) {
         //create the share
         await shareDocument(document.results[0].documentId, signatureData, annotations, signatures, signatureFields);
     }
+}
+
+async function getSignEntityByRoleId(userRoleId, template){
+    return template.signEntities.find(signEntity => signEntity.userRoleId === userRoleId);
+}
+
+async function getSignEntityByOrder(order, template){
+    return template.signEntities.find(signEntity => signEntity.order === order);
 }
 
 
@@ -199,7 +196,7 @@ async function createDocument(fileName, fileHash) {
     return rp(options);
 }
 
-async function generateShareTo(type, email, order, message, mailOtp) {
+async function generateShareTo(type, email, order, shareData) {
     let data = {
         "sharePurpose": type,
         "shareTo": email,
@@ -209,15 +206,41 @@ async function generateShareTo(type, email, order, message, mailOtp) {
         "order": order
     };
 
-    if (message) {
-        data.message = message;
+    if(shareData.expirationTime){
+        data.validUntil = await calculateFutureDate(shareData.expirationTime);
     }
 
-    if (mailOtp) {
+    if(shareData.remindersEnabled){
+        data.automaticReminder = {};
+        data.automaticReminder.start = await calculateFutureDate(shareData.remindersStartDays);
+        if(shareData.remindersStartDays.type === "time_span_span"){
+            data.automaticReminder.intervalDays = shareData.remindersIntervalDays;
+        }
+    }
+
+    if (shareData.message) {
+        data.message = shareData.message;
+    }
+
+    if (shareData.mailProtection) {
         data.mail = email;
     }
 
     return data;
+}
+
+async function calculateFutureDate(dateObj){
+    if(dateObj.type === "time_span_time"){
+        return dateObj.exactTime;
+    }
+
+    if(dateObj.type === "time_span_span"){
+        let modifier = {};
+        modifier[dateObj.timeSize.size + "s"] = dateObj.timeSize.span;
+        return dateFns.add(new Date(), modifier);
+    }
+
+    return new Date();
 }
 
 
