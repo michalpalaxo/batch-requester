@@ -56,9 +56,16 @@ async function createRequests(data) {
                 if (item[fieldConfig.customId]) {
                     field.text = " " + item[fieldConfig.customId];
                 } else {
-                    field.text = "Null";
+                    if (field.subtype !== "annotation_radio") {
+                        field.text = "Null";
+                    }
                 }
-                annotations.push(field);
+                if (field.userRoleId === 0) {
+                    annotations.push(field);
+                } else {
+                    field.user = [shareTo];
+                    signatureFields.push(field);
+                }
             }
 
             if (field.type === "signature" || field.type === "initials" || field.type === "stamp") {
@@ -96,11 +103,11 @@ async function createRequests(data) {
     }
 }
 
-async function getSignEntityByRoleId(userRoleId, template){
+async function getSignEntityByRoleId(userRoleId, template) {
     return template.signEntities.find(signEntity => signEntity.userRoleId === userRoleId);
 }
 
-async function getSignEntityByOrder(order, template){
+async function getSignEntityByOrder(order, template) {
     return template.signEntities.find(signEntity => signEntity.order === order);
 }
 
@@ -206,14 +213,14 @@ async function generateShareTo(type, email, order, shareData) {
         "order": order
     };
 
-    if(shareData.expirationTime){
+    if (shareData.expirationTime) {
         data.validUntil = await calculateFutureDate(shareData.expirationTime);
     }
 
-    if(shareData.remindersEnabled){
+    if (shareData.remindersEnabled) {
         data.automaticReminder = {};
         data.automaticReminder.start = await calculateFutureDate(shareData.remindersStartDays);
-        if(shareData.remindersStartDays.type === "time_span_span"){
+        if (shareData.remindersStartDays.type === "time_span_span") {
             data.automaticReminder.intervalDays = shareData.remindersIntervalDays;
         }
     }
@@ -234,12 +241,12 @@ async function generateShareTo(type, email, order, shareData) {
     return data;
 }
 
-async function calculateFutureDate(dateObj){
-    if(dateObj.type === "time_span_time"){
+async function calculateFutureDate(dateObj) {
+    if (dateObj.type === "time_span_time") {
         return dateObj.exactTime;
     }
 
-    if(dateObj.type === "time_span_span"){
+    if (dateObj.type === "time_span_span") {
         let modifier = {};
         modifier[dateObj.timeSize.size + "s"] = dateObj.timeSize.span;
         return dateFns.add(new Date(), modifier);
